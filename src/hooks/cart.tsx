@@ -42,7 +42,7 @@ const CartProvider: React.FC = ({ children }) => {
       //   setProducts([]);
       // });
 
-      // console.log(`cartProducts: ${storagedProducts}`);
+      console.log(`cartProducts: ${storagedProducts}`);
 
       storagedProducts.forEach(storagePair => {
         if (storagePair[1]) {
@@ -54,42 +54,44 @@ const CartProvider: React.FC = ({ children }) => {
       setProducts(loadedProducts);
     }
 
+    // if (products.length === 0) {
     loadProducts();
+    // }
   }, []);
 
   const increment = useCallback(
     async id => {
       const key = `${STORAGE_KEY}:${id}`;
 
-      try {
-        const savedProduct = await AsyncStorage.getItem(key).then(p => {
-          return p && JSON.parse(p);
-        });
+      // try {
+      const savedProduct = await AsyncStorage.getItem(key).then(p => {
+        return p && JSON.parse(p);
+      });
 
-        const productDelta = { quantity: savedProduct.quantity + 1 };
-        await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
+      const productDelta = { quantity: savedProduct.quantity + 1 };
+      await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
 
-        const newProduct = await AsyncStorage.getItem(key).then(p => {
-          return p && JSON.parse(p);
-        });
+      const newProduct = await AsyncStorage.getItem(key).then(p => {
+        return p && JSON.parse(p);
+      });
 
-        setProducts(
-          products.map(prod =>
-            prod.id === newProduct.id
-              ? { ...prod, quantity: newProduct.quantity }
-              : prod,
-          ),
-        );
-      } catch (err) {
-        console.log(err);
-      }
+      setProducts(
+        products.map(prod =>
+          prod.id === newProduct.id
+            ? { ...prod, quantity: newProduct.quantity }
+            : prod,
+        ),
+      );
+      // } catch (err) {
+      //   console.log(err);
+      // }
     },
     [products],
   );
 
   const addToCart = useCallback(
     async product => {
-      // console.log(products);
+      console.log(products);
       const productInCart = products.find(
         savedProduct => savedProduct.id === product.id,
       );
@@ -113,34 +115,30 @@ const CartProvider: React.FC = ({ children }) => {
     async id => {
       const key = `${STORAGE_KEY}:${id}`;
 
-      try {
-        const savedProduct = await AsyncStorage.getItem(key).then(p => {
+      const savedProduct = await AsyncStorage.getItem(key).then(p => {
+        return p && JSON.parse(p);
+      });
+
+      if (savedProduct.quantity === 1) {
+        // remove from storage
+        await AsyncStorage.removeItem(key);
+        // remove from state
+        setProducts(products.filter(prod => prod.id !== id));
+      } else {
+        const productDelta = { quantity: savedProduct.quantity - 1 };
+        await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
+
+        const newProduct = await AsyncStorage.getItem(key).then(p => {
           return p && JSON.parse(p);
         });
 
-        if (savedProduct.quantity === 1) {
-          // remove from storage
-          await AsyncStorage.removeItem(key);
-          // remove from state
-          setProducts(products.filter(prod => prod.id !== id));
-        } else {
-          const productDelta = { quantity: savedProduct.quantity - 1 };
-          await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
-
-          const newProduct = await AsyncStorage.getItem(key).then(p => {
-            return p && JSON.parse(p);
-          });
-
-          setProducts(
-            products.map(prod =>
-              prod.id === newProduct.id
-                ? { ...prod, quantity: newProduct.quantity }
-                : prod,
-            ),
-          );
-        }
-      } catch (err) {
-        console.log(err);
+        setProducts(
+          products.map(prod =>
+            prod.id === newProduct.id
+              ? { ...prod, quantity: newProduct.quantity }
+              : prod,
+          ),
+        );
       }
     },
     [products],

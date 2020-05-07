@@ -56,14 +56,19 @@ const Cart: React.FC = () => {
     let total = 0;
 
     products.forEach(product => {
-      total += product.price;
+      total += product.price * product.quantity;
     });
 
     return formatValue(total);
   }, [products]);
 
   const totalItensInCart = useMemo(() => {
-    return products.length;
+    let itensInCart = 0;
+    products.map(product => {
+      itensInCart += product.quantity;
+      return true;
+    });
+    return itensInCart;
   }, [products]);
 
   return (
