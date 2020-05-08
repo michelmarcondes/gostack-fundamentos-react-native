@@ -36,7 +36,6 @@ const TestComponent: React.FC = () => {
       title: 'Test product',
       image_url: 'test',
       price: 1000,
-      quantity: 0,
     });
   }
 

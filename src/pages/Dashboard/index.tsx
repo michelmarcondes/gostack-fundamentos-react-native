@@ -43,8 +43,7 @@ const Dashboard: React.FC = () => {
   }, []);
 
   function handleAddToCart(item: Product): void {
-    const { id, title, image_url, price } = item;
-    addToCart({ id, title, image_url, price, quantity: 1 });
+    addToCart(item);
   }
 
   return (

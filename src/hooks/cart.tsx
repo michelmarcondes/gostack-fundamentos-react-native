@@ -8,7 +8,7 @@ import React, {
 
 import AsyncStorage from '@react-native-community/async-storage';
 
-const STORAGE_KEY = '@GoMarketplace';
+const STORAGE_KEY = '@GoMarketplace:Cart';
 
 interface Product {
   id: string;
@@ -20,7 +20,7 @@ interface Product {
 
 interface CartContext {
   products: Product[];
-  addToCart(item: Product): void;
+  addToCart(item: Omit<Product, 'quantity'>): void;
   increment(id: string): void;
   decrement(id: string): void;
 }
@@ -28,120 +28,83 @@ interface CartContext {
 const CartContext = createContext<CartContext | null>(null);
 
 const CartProvider: React.FC = ({ children }) => {
-  const loadedProducts: Product[] = [];
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     async function loadProducts(): Promise<void> {
-      const storagekeys = await AsyncStorage.getAllKeys();
-      const storagedProducts = await AsyncStorage.multiGet(storagekeys);
-
-      // clear storage
-      // storagedProducts.map(async storagePair => {
-      //   await AsyncStorage.removeItem(storagePair[0]);
-      //   setProducts([]);
-      // });
-
-      console.log(`cartProducts: ${storagedProducts}`);
-
-      storagedProducts.forEach(storagePair => {
-        if (storagePair[1]) {
-          const product = JSON.parse(storagePair[1]);
-          loadedProducts.push(product);
-        }
-      });
-
-      setProducts(loadedProducts);
+      const storage = await AsyncStorage.getItem(STORAGE_KEY);
+      if (storage) {
+        setProducts(JSON.parse(storage));
+      }
     }
 
-    // if (products.length === 0) {
     loadProducts();
-    // }
   }, []);
 
-  const increment = useCallback(
-    async id => {
-      const key = `${STORAGE_KEY}:${id}`;
+  const saveOnStorage = useCallback(async data => {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }, []);
 
-      // try {
-      const savedProduct = await AsyncStorage.getItem(key).then(p => {
-        return p && JSON.parse(p);
-      });
-
-      const productDelta = { quantity: savedProduct.quantity + 1 };
-      await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
-
-      const newProduct = await AsyncStorage.getItem(key).then(p => {
-        return p && JSON.parse(p);
-      });
-
-      setProducts(
-        products.map(prod =>
-          prod.id === newProduct.id
-            ? { ...prod, quantity: newProduct.quantity }
-            : prod,
-        ),
+  const findProduct = useCallback(
+    id => {
+      const productList = [...products];
+      const index = productList.findIndex(
+        productListItem => productListItem.id === id,
       );
-      // } catch (err) {
-      //   console.log(err);
-      // }
+
+      return { productList, index };
     },
     [products],
   );
 
   const addToCart = useCallback(
     async product => {
-      console.log(products);
-      const productInCart = products.find(
-        savedProduct => savedProduct.id === product.id,
-      );
+      const { productList, index } = findProduct(product.id);
 
-      if (productInCart) {
-        increment(product.id);
-        return;
+      if (index >= 0) {
+        productList[index].quantity += 1;
+        setProducts(productList);
+      } else {
+        setProducts([...productList, { ...product, quantity: 1 }]);
       }
 
-      await AsyncStorage.setItem(
-        `${STORAGE_KEY}:${product.id}`,
-        JSON.stringify(product),
-      );
-
-      setProducts([...products, product]);
+      saveOnStorage(productList);
     },
-    [products, increment],
+    [findProduct, saveOnStorage],
+  );
+
+  const increment = useCallback(
+    async id => {
+      const { productList, index } = findProduct(id);
+
+      if (index > -1) {
+        productList[index].quantity += 1;
+        setProducts(productList);
+      }
+
+      saveOnStorage(productList);
+    },
+    [findProduct, saveOnStorage],
   );
 
   const decrement = useCallback(
     async id => {
-      const key = `${STORAGE_KEY}:${id}`;
+      const { productList, index } = findProduct(id);
+      const product = productList[index];
 
-      const savedProduct = await AsyncStorage.getItem(key).then(p => {
-        return p && JSON.parse(p);
-      });
-
-      if (savedProduct.quantity === 1) {
-        // remove from storage
-        await AsyncStorage.removeItem(key);
-        // remove from state
-        setProducts(products.filter(prod => prod.id !== id));
+      if (index > -1 && product.quantity > 1) {
+        product.quantity -= 1;
+        setProducts(productList);
+        saveOnStorage(productList);
       } else {
-        const productDelta = { quantity: savedProduct.quantity - 1 };
-        await AsyncStorage.mergeItem(key, JSON.stringify(productDelta));
-
-        const newProduct = await AsyncStorage.getItem(key).then(p => {
-          return p && JSON.parse(p);
-        });
-
-        setProducts(
-          products.map(prod =>
-            prod.id === newProduct.id
-              ? { ...prod, quantity: newProduct.quantity }
-              : prod,
-          ),
+        const updatedProductList = productList.filter(
+          productListItem => productListItem.id !== product.id,
         );
+        setProducts(updatedProductList);
+        saveOnStorage(updatedProductList);
       }
     },
-    [products],
+    [findProduct, saveOnStorage],
   );
 
   const value = React.useMemo(
